@@ -1,12 +1,5 @@
-"""
-Async SQLAlchemy engine + session factory.
-Engine is created lazily on first use so that import-time failures
-(missing env vars) surface as clear RuntimeErrors, not obscure None errors.
-"""
-
 from __future__ import annotations
 from collections.abc import AsyncGenerator
-from typing import TYPE_CHECKING
 
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
@@ -26,12 +19,19 @@ def _get_engine() -> AsyncEngine:
     global _engine, _session_factory
     if _engine is None:
         settings = get_settings()
+
+        # SSL required for Supabase, not needed locally
+        connect_args = (
+            {"ssl": "require"} if settings.ENV == "prod" else {}
+        )
+
         _engine = create_async_engine(
-            settings.active_db_url,          # raises RuntimeError if None
+            settings.active_db_url,
             echo=settings.DEBUG,
             pool_pre_ping=True,
             pool_size=10,
             max_overflow=20,
+            connect_args=connect_args,
         )
         _session_factory = async_sessionmaker(
             bind=_engine,
@@ -46,7 +46,7 @@ class Base(DeclarativeBase):
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
-    _get_engine()                              # ensure engine is initialised
+    _get_engine()
     async with _session_factory() as session:
         try:
             yield session
