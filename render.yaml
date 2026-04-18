@@ -50,3 +50,53 @@ services:
       sync: false
     - key: SECRET_KEY
       sync: false
+
+  - type: web
+    name: fairgig-grievance-node
+    runtime: node
+    repo: https://github.com/hassan-jamshaid10/fairgig-backend.git
+    rootDir: services-node/grievance-service
+    plan: free
+    region: oregon
+    buildCommand: npm ci
+    startCommand: npm start
+    autoDeployTrigger: commit
+    envVars:
+    - key: NODE_ENV
+      value: production
+    - key: DATABASE_URL
+      sync: false
+    - key: AUTH_SERVICE_URL
+      sync: false
+
+  - type: web
+    name: fairgig-analytics-node
+    runtime: node
+    repo: https://github.com/hassan-jamshaid10/fairgig-backend.git
+    rootDir: services-node/analytics-service
+    plan: free
+    region: oregon
+    buildCommand: npm ci
+    startCommand: npm start
+    autoDeployTrigger: commit
+    envVars:
+    - key: NODE_ENV
+      value: production
+    - key: DATABASE_URL
+      sync: false
+
+  - type: web
+    name: fairgig-certificate-node
+    runtime: node
+    repo: https://github.com/hassan-jamshaid10/fairgig-backend.git
+    rootDir: services-node/certificate-service
+    plan: free
+    region: oregon
+    buildCommand: npm ci
+    startCommand: npm start
+    autoDeployTrigger: commit
+    envVars:
+    - key: NODE_ENV
+      value: production
+    - key: DATABASE_URL
+      sync: false
