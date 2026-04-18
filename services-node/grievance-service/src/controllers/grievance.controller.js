@@ -1,4 +1,4 @@
-const pool = require('../db/pool');
+const { pool } = require('../db/pool');
 const stringSimilarity = require('string-similarity');
 const { v4: uuidv4 } = require('uuid');
 
