@@ -11,7 +11,6 @@ app.use(
 		methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
 	})
 );
-app.options('*', cors());
 
 app.use(express.json());
 
