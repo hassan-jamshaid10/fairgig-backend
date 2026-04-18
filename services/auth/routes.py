@@ -1,39 +1,48 @@
 """
-Auth routes — register, login, verify token.
+Auth routes — register, login, refresh, verify token.
 """
 
-import uuid
+import bcrypt
 from datetime import datetime, timezone
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from passlib.context import CryptContext
+from fastapi.security import OAuth2PasswordBearer
+from jose import JWTError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.database import get_db
-from shared.schemas import Token, UserCreate, UserRead, MessageResponse
-from shared.security import create_access_token, decode_access_token
-from services.auth.models import UserORM
+from shared.schemas import TokenPair, UserCreate, UserRead, LoginRequest, RefreshRequest
+from shared.security import (
+    create_access_token,
+    create_refresh_token,
+    decode_access_token,
+    decode_refresh_token,
+)
+from services.auth.models import UserORM, RoleORM
 
 router = APIRouter()
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def hash_password(plain: str) -> str:
-    return pwd_context.hash(plain)
+    return bcrypt.hashpw(plain.encode(), bcrypt.gensalt()).decode()
 
 
 def verify_password(plain: str, hashed: str) -> bool:
-    return pwd_context.verify(plain, hashed)
+    return bcrypt.checkpw(plain.encode(), hashed.encode())
 
 
 async def get_user_by_email(db: AsyncSession, email: str) -> UserORM | None:
     result = await db.execute(select(UserORM).where(UserORM.email == email))
+    return result.scalar_one_or_none()
+
+
+async def get_user_by_id(db: AsyncSession, user_id: str) -> UserORM | None:
+    result = await db.execute(select(UserORM).where(UserORM.id == user_id))
     return result.scalar_one_or_none()
 
 
@@ -52,13 +61,23 @@ async def register(payload: UserCreate, db: AsyncSession = Depends(get_db)):
             status_code=status.HTTP_409_CONFLICT,
             detail="Email already registered.",
         )
+
+    role_result = await db.execute(select(RoleORM).where(RoleORM.name == payload.role))
+    role_orm = role_result.scalar_one_or_none()
+    if not role_orm:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Role '{payload.role}' does not exist.",
+        )
+
     user = UserORM(
-        id=str(uuid.uuid4()),
         email=payload.email,
         full_name=payload.full_name,
-        hashed_password=hash_password(payload.password),
-        is_active=True,
+        phone=payload.phone,
+        city_zone=payload.city_zone,
+        password_hash=hash_password(payload.password),
         created_at=datetime.now(timezone.utc),
+        roles=[role_orm],
     )
     db.add(user)
     await db.flush()
@@ -67,47 +86,72 @@ async def register(payload: UserCreate, db: AsyncSession = Depends(get_db)):
 
 @router.post(
     "/login",
-    response_model=Token,
-    summary="Login and receive JWT",
+    response_model=TokenPair,
+    summary="Login and receive access + refresh tokens",
 )
-async def login(
-    form: Annotated[OAuth2PasswordRequestForm, Depends()],
-    db: AsyncSession = Depends(get_db),
-):
-    """Login with email + password (OAuth2 form). Returns a JWT bearer token."""
-    user = await get_user_by_email(db, form.username)
-    if not user or not verify_password(form.password, user.hashed_password):
+async def login(payload: LoginRequest, db: AsyncSession = Depends(get_db)):
+    user = await get_user_by_email(db, payload.email)
+    if not user or not verify_password(payload.password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password.",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    token = create_access_token({"sub": user.id})
-    return Token(access_token=token)
+    token_data = {"sub": str(user.id), "role": user.role}
+    return TokenPair(
+        access_token=create_access_token(token_data),
+        refresh_token=create_refresh_token(token_data),
+        user_id=user.id,
+        role=user.role,
+    )
 
+
+@router.post(
+    "/refresh",
+    response_model=TokenPair,
+    summary="Exchange refresh token for a new token pair",
+)
+async def refresh(payload: RefreshRequest, db: AsyncSession = Depends(get_db)):
+    try:
+        token_payload = decode_refresh_token(payload.refresh_token)
+        user_id: str = token_payload.get("sub")
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired refresh token.",
+        )
+
+    user = await get_user_by_id(db, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+
+    token_data = {"sub": str(user.id), "role": user.role}
+    return TokenPair(
+        access_token=create_access_token(token_data),
+        refresh_token=create_refresh_token(token_data),
+        user_id=user.id,
+        role=user.role,
+    )
 
 @router.get(
     "/verify",
     response_model=UserRead,
-    summary="Verify token and return current user",
+    summary="Verify access token and return current user",
 )
 async def verify_token(
     token: Annotated[str, Depends(oauth2_scheme)],
     db: AsyncSession = Depends(get_db),
 ):
-    """Validate a JWT and return the associated user."""
-    from jose import JWTError
-
+    """Validate an access JWT and return the associated user."""
     try:
-        payload = decode_access_token(token)
-        user_id: str = payload.get("sub")
+        token_payload = decode_access_token(token)
+        user_id: str = token_payload.get("sub")
     except JWTError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token.",
         )
-    result = await db.execute(select(UserORM).where(UserORM.id == user_id))
-    user = result.scalar_one_or_none()
+    user = await get_user_by_id(db, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found.")
     return user

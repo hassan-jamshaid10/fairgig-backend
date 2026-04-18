@@ -1,41 +1,65 @@
-"""Shared Pydantic schemas + JWT helpers used across all services."""
+"""Shared Pydantic schemas used across all services."""
 
 from datetime import datetime
-from typing import Optional
+from uuid import UUID
+from typing import Optional, Literal
 from pydantic import BaseModel, EmailStr
 
 
-# ── Token ────────────────────────────────────────────────────────────────────
+# ── Token ─────────────────────────────────────────────────────────────────────
 
 class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
 
 
+class TokenPair(BaseModel):
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"
+    user_id: UUID
+    role: Optional[str] = None
+
+
 class TokenData(BaseModel):
-    sub: Optional[str] = None   # user id
+    sub: Optional[str] = None
 
 
-# ── User ─────────────────────────────────────────────────────────────────────
+class RefreshRequest(BaseModel):
+    refresh_token: str
+
+
+# ── User ──────────────────────────────────────────────────────────────────────
+
+Role = Literal["Worker", "Verifier", "Advocate"]
+
 
 class UserBase(BaseModel):
     email: EmailStr
     full_name: str
+    phone: Optional[str] = None
+    city_zone: Optional[str] = None
 
 
 class UserCreate(UserBase):
     password: str
+    role: Role
+
+
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str
 
 
 class UserRead(UserBase):
-    id: str
-    is_active: bool
+    id: UUID
     created_at: datetime
+    role: Optional[str] = None
 
     model_config = {"from_attributes": True}
 
 
-# ── Job ──────────────────────────────────────────────────────────────────────
+# ── Job ───────────────────────────────────────────────────────────────────────
 
 class JobBase(BaseModel):
     title: str
@@ -57,7 +81,7 @@ class JobRead(JobBase):
     model_config = {"from_attributes": True}
 
 
-# ── Generic ──────────────────────────────────────────────────────────────────
+# ── Generic ───────────────────────────────────────────────────────────────────
 
 class MessageResponse(BaseModel):
     message: str

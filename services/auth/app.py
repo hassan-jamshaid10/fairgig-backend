@@ -6,6 +6,10 @@ Start with:
     uv run uvicorn services.auth.app:app --reload --port 8001
 """
 
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent.parent.parent))
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
