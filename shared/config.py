@@ -1,8 +1,8 @@
 """
 Centralised settings — switches between local Postgres and Supabase (prod).
 
-Local  : set ENV=local  → uses DATABASE_URL (postgres://...)
-Prod   : set ENV=prod   → uses SUPABASE_URL + SUPABASE_KEY
+Local : set ENV=local → uses DATABASE_URL (postgresql+asyncpg://...)
+Prod  : set ENV=prod  → uses SUPABASE_DB_URL (direct Postgres connection string from Supabase)
 """
 
 from functools import lru_cache
@@ -23,10 +23,8 @@ class Settings(BaseSettings):
     # ── Local Postgres ────────────────────────────────────────────────────────
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/fairgig"
 
-    # ── Supabase (prod) ───────────────────────────────────────────────────────
-    SUPABASE_URL: str = ""
-    SUPABASE_KEY: str = ""      # service_role key (backend only)
-    SUPABASE_DB_URL: str = ""   # direct postgres connection string from Supabase
+    # ── Supabase prod — direct Postgres connection string only ────────────────
+    SUPABASE_DB_URL: str = ""   # e.g. postgresql+asyncpg://postgres:[pw]@db.[ref].supabase.co:5432/postgres
 
     # ── Auth / JWT ────────────────────────────────────────────────────────────
     SECRET_KEY: str = "change-me-in-production-please"
@@ -41,7 +39,6 @@ class Settings(BaseSettings):
 
     @property
     def active_db_url(self) -> str:
-        """Return the correct DB URL based on ENV."""
         if self.ENV == "prod" and self.SUPABASE_DB_URL:
             return self.SUPABASE_DB_URL
         return self.DATABASE_URL
