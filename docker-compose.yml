@@ -1,0 +1,54 @@
+version: "3.9"
+
+services:
+  # ── Local Postgres ───────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: fairgig
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  # ── Auth Service ──────────────────────────────────────────────────────────────
+  auth:
+    build: .
+    command: uv run uvicorn services.auth.app:app --host 0.0.0.0 --port 8001
+    env_file: .env.local
+    ports:
+      - "8001:8001"
+    depends_on:
+      - postgres
+    volumes:
+      - .:/app
+
+  # ── Users Service ─────────────────────────────────────────────────────────────
+  users:
+    build: .
+    command: uv run uvicorn services.users.app:app --host 0.0.0.0 --port 8002
+    env_file: .env.local
+    ports:
+      - "8002:8002"
+    depends_on:
+      - postgres
+    volumes:
+      - .:/app
+
+  # ── Jobs Service ──────────────────────────────────────────────────────────────
+  jobs:
+    build: .
+    command: uv run uvicorn services.jobs.app:app --host 0.0.0.0 --port 8003
+    env_file: .env.local
+    ports:
+      - "8003:8003"
+    depends_on:
+      - postgres
+    volumes:
+      - .:/app
+
+volumes:
+  postgres_data:
