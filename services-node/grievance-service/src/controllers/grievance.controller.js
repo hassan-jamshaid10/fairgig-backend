@@ -4,12 +4,43 @@ const { v4: uuidv4 } = require('uuid');
 
 // FEATURE 1: Create a Grievance
 const createGrievance = async (req, res) => {
-  const { platform, category, description, is_anonymous, tags } = req.body;
+  const body = req.body || {};
+  const {
+    platform,
+    category,
+    description,
+    is_anonymous = false,
+    tags,
+  } = body;
+
+  if (!platform || !category || !description) {
+    return res.status(400).json({
+      detail: 'Invalid payload. platform, category, and description are required.',
+    });
+  }
+
+  if (!Array.isArray(tags) && typeof tags !== 'undefined') {
+    return res.status(400).json({
+      detail: 'Invalid payload. tags must be an array when provided.',
+    });
+  }
+
   const worker_id = req.user.sub;
   const client = await pool.connect();
 
   try {
     await client.query('BEGIN');
+
+    const workerCheck = await client.query(
+      'SELECT id FROM auth_svc.users WHERE id = $1 LIMIT 1',
+      [worker_id]
+    );
+    if (workerCheck.rowCount === 0) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({
+        detail: 'Token user does not exist in auth_svc.users for this database. Login against this environment first.',
+      });
+    }
 
     const grievanceQuery = `
       INSERT INTO grievance_svc.grievances 
@@ -44,6 +75,11 @@ const createGrievance = async (req, res) => {
   } catch (error) {
     await client.query('ROLLBACK');
     console.error("Database Error:", error);
+    if (error && error.code === '23503') {
+      return res.status(400).json({
+        detail: 'Invalid worker reference. Ensure the token user exists in auth_svc.users.',
+      });
+    }
     res.status(500).json({ detail: "Failed to save grievance and tags" });
   } finally {
     client.release();

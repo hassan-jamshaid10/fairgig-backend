@@ -17,19 +17,28 @@ const {
 const router = express.Router();
 
 const authenticateToken = (req, res, next) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
+  const authHeader = req.headers['authorization'] || req.headers['Authorization'];
+  const token = authHeader && authHeader.startsWith('Bearer ')
+    ? authHeader.slice(7).trim()
+    : null;
 
   if (!token) {
     return res.status(401).json({ detail: "No token provided" });
   }
 
-  const secret = process.env.SECRET_KEY || "change-me-in-production";
+  const isProd = (process.env.ENV || process.env.NODE_ENV || 'local').toLowerCase() === 'prod'
+    || (process.env.NODE_ENV || '').toLowerCase() === 'production';
+  const secret = (process.env.SECRET_KEY || process.env.JWT_SECRET || '').trim();
+
+  if (!secret) {
+    return res.status(500).json({ detail: 'Server auth misconfigured: SECRET_KEY missing' });
+  }
   
-  jwt.verify(token, secret, (err, decodedUser) => {
+  jwt.verify(token, secret, { algorithms: ['HS256'] }, (err, decodedUser) => {
     if (err) {
       console.error("JWT FAILURE REASON:", err.message);
-      return res.status(403).json({ detail: "Invalid or expired token" });
+      const detail = isProd ? 'Invalid or expired token' : `Invalid token: ${err.message}`;
+      return res.status(403).json({ detail });
     }
     req.user = decodedUser;
     next();
