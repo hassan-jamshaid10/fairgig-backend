@@ -62,8 +62,12 @@ services:
     startCommand: npm start
     autoDeployTrigger: commit
     envVars:
+    - key: ENV
+      value: prod
     - key: NODE_ENV
       value: production
+    - key: SUPABASE_DB_URL
+      sync: false
     - key: DATABASE_URL
       sync: false
     - key: AUTH_SERVICE_URL
