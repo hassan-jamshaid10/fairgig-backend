@@ -36,7 +36,7 @@ jobs:
         shell: bash
         run: |
           set -e
-          uv run pytest -q || code=$?
+          uv run --with pytest pytest -q || code=$?
           if [ "${code:-0}" -eq 5 ]; then
             echo "No tests collected."
             exit 0
