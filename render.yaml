@@ -1,0 +1,60 @@
+# Exported for FairGig Backend
+version: "1"
+projects:
+- name: FairGig
+  environments:
+  - name: Production
+    services:
+    - type: web
+      name: fairgig-auth
+      runtime: python
+      repo: https://github.com/hassan-jamshaid10/fairgig-backend.git
+      plan: free
+      region: oregon
+      rootDir: backend
+      buildCommand: pip install uv && uv sync --frozen && uv cache prune --ci
+      startCommand: uv run uvicorn services.auth.app:app --host 0.0.0.0 --port $PORT
+      autoDeployTrigger: commit
+      envVars:
+      - key: ENV
+        value: prod
+      - key: SUPABASE_DB_URL
+        sync: false
+      - key: SECRET_KEY
+        sync: false
+
+    - type: web
+      name: fairgig-earnings
+      runtime: python
+      repo: https://github.com/hassan-jamshaid10/fairgig-backend.git
+      plan: free
+      region: oregon
+      rootDir: backend
+      buildCommand: pip install uv && uv sync --frozen && uv cache prune --ci
+      startCommand: uv run uvicorn services.earnings.app:app --host 0.0.0.0 --port $PORT
+      autoDeployTrigger: commit
+      envVars:
+      - key: ENV
+        value: prod
+      - key: SUPABASE_DB_URL
+        sync: false
+      - key: SECRET_KEY
+        sync: false
+
+    - type: web
+      name: fairgig-grievance
+      runtime: python
+      repo: https://github.com/hassan-jamshaid10/fairgig-backend.git
+      plan: free
+      region: oregon
+      rootDir: backend
+      buildCommand: pip install uv && uv sync --frozen && uv cache prune --ci
+      startCommand: uv run uvicorn services.grievance.app:app --host 0.0.0.0 --port $PORT
+      autoDeployTrigger: commit
+      envVars:
+      - key: ENV
+        value: prod
+      - key: SUPABASE_DB_URL
+        sync: false
+      - key: SECRET_KEY
+        sync: false
