@@ -1,4 +1,14 @@
-require('dotenv').config();
+const path = require('path');
+const dotenv = require('dotenv');
+
+const runtimeEnv = (process.env.ENV || process.env.NODE_ENV || 'local').toLowerCase();
+const envFile = (runtimeEnv === 'prod' || runtimeEnv === 'production')
+  ? '.env.production'
+  : '.env.local';
+
+dotenv.config({ path: path.join(__dirname, envFile) });
+console.log(`[startup] Loaded env file: ${envFile}`);
+
 const app = require('./src/app');
 const { verifyDbConnection, getDatabaseUrl } = require('./src/db/pool');
 

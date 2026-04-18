@@ -1,4 +1,6 @@
 const { Pool } = require('pg');
+const path = require('path');
+const dotenv = require('dotenv');
 
 function getAppEnv() {
   return (process.env.ENV || process.env.NODE_ENV || 'local').toLowerCase();
@@ -7,6 +9,13 @@ function getAppEnv() {
 function getDatabaseUrl() {
   const env = getAppEnv();
   const isProd = env === 'prod' || env === 'production';
+
+  // Fallback: load service-level env file if vars are not already present.
+  if (!process.env.SUPABASE_DB_URL && !process.env.DATABASE_URL) {
+    const envFile = isProd ? '.env.production' : '.env.local';
+    const envPath = path.resolve(__dirname, '../../', envFile);
+    dotenv.config({ path: envPath });
+  }
 
   const databaseUrl = isProd
     ? (process.env.SUPABASE_DB_URL || process.env.DATABASE_URL)
