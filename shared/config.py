@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     DEBUG: bool = True
 
     # ── Local Postgres ────────────────────────────────────────────────────────
-    DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/fairgig"
+    DATABASE_URL: str = "postgresql+asyncpg://postgres:admin@localhost:5432/fairgig"
 
     # ── Supabase prod — direct Postgres connection string only ────────────────
     SUPABASE_DB_URL: str = ""   # e.g. postgresql+asyncpg://postgres:[pw]@db.[ref].supabase.co:5432/postgres
