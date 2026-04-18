@@ -69,7 +69,7 @@ for service, config in services.items():
         print(f"  ✅ Created file: {full_file}")
 
     # npm init
-    print(f"\n  📦 Running npm init...")
+    print("\n  📦 Running npm init...")
     subprocess.run("npm init -y", shell=True, cwd=service_path)
 
     # Update package.json scripts
@@ -83,10 +83,10 @@ for service, config in services.items():
     }
     with open(pkg_path, "w") as f:
         json.dump(pkg, f, indent=2)
-    print(f"  ✅ Updated package.json scripts")
+    print("  ✅ Updated package.json scripts")
 
     # npm install
-    print(f"\n  📦 Installing packages...")
+    print("\n  📦 Installing packages...")
     subprocess.run(f"npm install {config['packages']}", shell=True, cwd=service_path)
     subprocess.run(f"npm install --save-dev {config['dev_packages']}", shell=True, cwd=service_path)
 
@@ -98,7 +98,7 @@ AUTH_SERVICE_URL=http://localhost:8001
 """
     with open(os.path.join(service_path, ".env"), "w") as f:
         f.write(env_content)
-    print(f"  ✅ Written .env")
+    print("  ✅ Written .env")
 
 print(f"\n{'='*50}")
 print("✅ All services initialized successfully!")
