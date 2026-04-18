@@ -1,0 +1,95 @@
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+
+jobs:
+  build-local:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: fairgig
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d fairgig"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+    env:
+      ENV: local
+      DEBUG: "false"
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/fairgig
+      SUPABASE_DB_URL: ""
+      SECRET_KEY: ci-secret
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v2
+
+      - name: Install dependencies
+        run: uv sync --dev
+
+      - name: Lint (ruff)
+        run: uv run ruff check .
+
+      - name: Tests (pytest)
+        shell: bash
+        run: |
+          set -e
+          uv run pytest -q || code=$?
+          if [ "${code:-0}" -eq 5 ]; then
+            echo "No tests collected."
+            exit 0
+          fi
+          exit ${code:-0}
+
+  build-prod:
+    runs-on: ubuntu-latest
+    env:
+      ENV: prod
+      DEBUG: "false"
+      DATABASE_URL: ""
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      SECRET_KEY: ${{ secrets.SECRET_KEY }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v2
+
+      - name: Install dependencies
+        run: uv sync --dev
+
+      - name: Lint (ruff)
+        run: uv run ruff check .
+
+      - name: Tests (pytest)
+        shell: bash
+        run: |
+          set -e
+          uv run pytest -q || code=$?
+          if [ "${code:-0}" -eq 5 ]; then
+            echo "No tests collected."
+            exit 0
+          fi
+          exit ${code:-0}
