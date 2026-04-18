@@ -3,7 +3,6 @@ Users routes — profile CRUD.
 Authentication is done via JWT forwarded from the gateway.
 """
 
-import uuid
 from datetime import datetime, timezone
 from typing import Annotated
 
