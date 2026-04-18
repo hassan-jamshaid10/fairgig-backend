@@ -2,10 +2,8 @@ import os
 from functools import lru_cache
 from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import field_validator
 
-# Resolve env file relative to this file's location (backend/shared/)
-_BASE = Path(__file__).parent.parent          # → backend/
+_BASE = Path(__file__).parent.parent
 _ENV_NAME = os.getenv("ENV", "local")
 _ENV_FILE = _BASE / (".env.production" if _ENV_NAME == "prod" else f".env.{_ENV_NAME}")
 
@@ -37,9 +35,9 @@ class Settings(BaseSettings):
         url = self.SUPABASE_DB_URL if self.ENV == "prod" else self.DATABASE_URL
         if not url:
             raise RuntimeError(
-                f"No database URL configured for ENV='{self.ENV}'. "
-                f"Set {'SUPABASE_DB_URL' if self.ENV == 'prod' else 'DATABASE_URL'} "
-                f"in {_ENV_FILE}"
+                f"No DB URL for ENV='{self.ENV}'. "
+                f"Set {'SUPABASE_DB_URL' if self.ENV == 'prod' else 'DATABASE_URL'}"
+                f" in {_ENV_FILE}"
             )
         return url
 
