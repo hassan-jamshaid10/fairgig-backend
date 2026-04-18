@@ -1,8 +1,9 @@
 """Shared Pydantic schemas used across all services."""
 
 from datetime import datetime
+from typing import Literal, Optional
 from uuid import UUID
-from typing import Optional, Literal
+
 from pydantic import BaseModel, EmailStr
 
 
@@ -89,3 +90,18 @@ class MessageResponse(BaseModel):
 
 class ErrorResponse(BaseModel):
     detail: str
+
+class UserUpdate(BaseModel):
+    full_name: Optional[str] = None
+    phone: Optional[str] = None
+    city_zone: Optional[str] = None
+
+
+class UserBasicRead(BaseModel):
+    id: UUID
+    full_name: str
+    city_zone: Optional[str] = None
+    role: str
+
+    class Config:
+        from_attributes = True  # Allows Pydantic to read directly from your ORM models
