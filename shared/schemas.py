@@ -4,6 +4,11 @@ from datetime import datetime
 from uuid import UUID
 from typing import Optional, Literal
 from pydantic import BaseModel, EmailStr
+from typing import Optional
+from pydantic import BaseModel
+from pydantic import BaseModel
+from typing import Optional
+from uuid import UUID
 
 
 # ── Token ─────────────────────────────────────────────────────────────────────
@@ -89,3 +94,18 @@ class MessageResponse(BaseModel):
 
 class ErrorResponse(BaseModel):
     detail: str
+
+class UserUpdate(BaseModel):
+    full_name: Optional[str] = None
+    phone: Optional[str] = None
+    city_zone: Optional[str] = None
+
+
+class UserBasicRead(BaseModel):
+    id: UUID
+    full_name: str
+    city_zone: Optional[str] = None
+    role: str
+
+    class Config:
+        from_attributes = True  # Allows Pydantic to read directly from your ORM models

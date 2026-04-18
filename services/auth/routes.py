@@ -5,6 +5,13 @@ Auth routes — register, login, refresh, verify token.
 import bcrypt
 from datetime import datetime, timezone
 from typing import Annotated
+from sqlalchemy import select, text
+from fastapi.security import OAuth2PasswordRequestForm
+from typing import Optional
+from fastapi import Query
+from shared.schemas import UserRead
+from shared.schemas import UserUpdate
+from shared.schemas import UserBasicRead
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
@@ -155,3 +162,163 @@ async def verify_token(
     if not user:
         raise HTTPException(status_code=404, detail="User not found.")
     return user
+
+
+@router.get(
+    "/me",
+    response_model=UserRead,
+    summary="Get current logged in user profile",
+)
+async def get_me(
+    db: AsyncSession = Depends(get_db),
+    access_token: Optional[str] = Query(None, description="Paste your JWT token here"),
+    header_token: Optional[str] = Depends(OAuth2PasswordBearer(tokenUrl="/auth/login", auto_error=False)),
+):
+    """
+    Returns the currently logged in user's information.
+    Accepts token via query parameter or Authorization header.
+    """
+    token = access_token or header_token
+
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated. Please provide an access token.",
+        )
+
+    try:
+        token_payload = decode_access_token(token)
+        user_id: str = token_payload.get("sub")
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token.",
+        )
+
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token missing user identification.",
+        )
+
+    # Use your existing ORM helper instead of raw SQL
+    user = await get_user_by_id(db, user_id)
+
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found.")
+
+    return user
+
+@router.patch(
+    "/me",
+    response_model=UserRead,
+    summary="Update current logged in user profile",
+)
+async def update_me(
+    payload: UserUpdate,
+    db: AsyncSession = Depends(get_db),
+    access_token: Optional[str] = Query(None, description="Paste your JWT token here"),
+    header_token: Optional[str] = Depends(OAuth2PasswordBearer(tokenUrl="/auth/login", auto_error=False)),
+):
+    """
+    Updates the logged in user's profile. 
+    Ignores email or role updates.
+    """
+    token = access_token or header_token
+
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated. Please provide an access token.",
+        )
+
+    try:
+        token_payload = decode_access_token(token)
+        user_id: str = token_payload.get("sub")
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token.",
+        )
+
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token missing user identification.",
+        )
+
+    # 1. Fetch the user
+    user = await get_user_by_id(db, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+
+    # 2. Extract only the fields the user actually sent in the request body
+    # exclude_unset=True ensures we don't overwrite existing data with None
+    update_data = payload.model_dump(exclude_unset=True)
+
+    if not update_data:
+        return user # If body is empty, just return the existing user
+
+    # 3. Apply the updates safely
+    allowed_fields = {"full_name", "phone", "city_zone"}
+    
+    for key, value in update_data.items():
+        if key in allowed_fields:
+            setattr(user, key, value)
+
+    # 4. Save and return
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+
+    return user
+
+@router.get(
+    "/users/{user_id}",
+    response_model=UserBasicRead,
+    summary="Get basic user info (For Verifiers, Advocates, and internal microservices)",
+)
+async def get_user_basic_info(
+    user_id: str,
+    db: AsyncSession = Depends(get_db),
+    access_token: Optional[str] = Query(None, description="Paste your JWT token here"),
+    header_token: Optional[str] = Depends(OAuth2PasswordBearer(tokenUrl="/auth/login", auto_error=False)),
+):
+    """
+    Returns limited user info (id, full_name, city_zone, role) for cross-service communication.
+    Restricted to non-Worker roles.
+    """
+    token = access_token or header_token
+
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated. Please provide an access token.",
+        )
+
+    # 1. Decode token and extract the caller's role
+    try:
+        token_payload = decode_access_token(token)
+        caller_role: str = token_payload.get("role", "").lower()
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token.",
+        )
+
+    # 2. Strict Access Control (Workers get a 403)
+    if caller_role == "worker":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden. Workers are not authorized to look up other users.",
+        )
+
+    # 3. Fetch the requested user
+    target_user = await get_user_by_id(db, user_id)
+    
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found.")
+
+    # 4. Return the user 
+    # (Pydantic automatically filters this through UserBasicRead, dropping email and phone)
+    return target_user
