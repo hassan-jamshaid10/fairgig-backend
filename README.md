@@ -1,96 +1,79 @@
-# FairGig — Backend
+# FairGig — Backend Documentation
 
-> Microservice-based FastAPI backend for the FairGig freelance platform.
+## 1. System Architecture Overview
 
-## Architecture
+FairGig's backend is built using a **Microservice Architecture** that segregates responsibilities across different domains to ensure scalability, modularity, and privacy. 
 
-```
-backend/
-├── .env                    # Shared defaults (safe to commit)
-├── .env.local              # Local dev — PostgreSQL  (git-ignored)
-├── .env.production         # Production  — Supabase  (git-ignored)
-├── pyproject.toml          # uv project + dependencies
-├── Dockerfile
-├── docker-compose.yml
-│
-├── shared/                 # Cross-service utilities
-│   ├── config.py           # Pydantic Settings (env-aware)
-│   ├── database.py         # Async SQLAlchemy engine + session
-│   ├── supabase_client.py  # Supabase client (prod only)
-│   ├── schemas.py          # Shared Pydantic schemas
-│   └── security.py         # JWT sign / verify
-│
-└── services/
-    ├── auth/               # 🔐 Auth Service  — port 8001
-    │   ├── app.py
-    │   ├── models.py
-    │   ├── routes.py
-    │   └── README.md
-    ├── users/              # 👤 Users Service — port 8002
-    │   ├── app.py
-    │   ├── models.py
-    │   ├── schemas.py
-    │   ├── routes.py
-    │   └── README.md
-    └── jobs/               # 💼 Jobs Service  — port 8003
-        ├── app.py
-        ├── models.py
-        ├── schemas.py
-        ├── routes.py
-        └── README.md
-```
+The ecosystem leverages:
+- **Python (FastAPI)** for core transaction-level services (Auth, Users, Jobs, Earnings, Anomaly Detection).
+- **Node.js** for asynchronous processing and specific domain tasks (Analytics, Certificates, Grievances).
+- **PostgreSQL 17+** / **Supabase** as the master database, partitioned via schemas for different logical domains.
+- **Docker & Docker Compose** for local orchestration.
 
-## Prerequisites
+---
 
-- [uv](https://docs.astral.sh/uv/) ≥ 0.9
-- Python 3.11+
-- PostgreSQL 15+ (local) **or** a Supabase project (prod)
+## 2. Service Breakdown
 
-## Quick Start (Local)
+### Python Services (`/services`)
+Running on FastAPI and managed with the `uv` package manager:
+- **Auth Service (`port 8001`)**: Handles JWT authentication, user registration, and identity.
+- **Users Service (`port 8002`)**: Manages user profiles (Workers, Verifiers, Advocates).
+- **Jobs Service (`port 8003`)**: Orchestrates job or gig postings and applications.
+- **Earnings Service**: Processes shift logs, platform fee deductions, and verification screenshots.
+- **Anomaly-Service**: An AI/ML or statistical service to flag suspicious activities or unverified shifts.
 
-```powershell
-# 1. Install dependencies (cache stored on E:\uv_cache)
-cd E:\softec26\backend
+### Node.js Services (`/services-node`)
+- **Analytics Service**: Aggregates anonymous data for market trends, average pay, and geographic analysis.
+- **Certificate Service**: Generates compliance or proof-of-work certificates for cross-platform sharing.
+- **Grievance Service**: Handles worker complaints, categorizes them, and tracks their resolution workflow securely.
+
+---
+
+## 3. Database Schema Design (`schema.sql`)
+
+The database is heavily namespaced using PostgreSQL schemas to map directly to the microservice architecture.
+
+### Schema: `auth_svc` (Identity & Roles)
+Handles user identity and role-based access control.
+- **`roles`**: Table for system roles (`Worker`, `Verifier`, `Advocate`).
+- **`users`**: Central users table containing `email`, `password_hash`, `full_name`, `phone`, and `city_zone` (for anonymized geography).
+- **`user_roles`**: Junction table allowing many-to-many relationships (a user can hold multiple roles).
+
+### Schema: `earnings_svc` (Shifts & Verifications)
+Handles financial and work logs.
+- **`shifts`**: Primary shift records with `hours_worked`, `gross_earned`, `platform_deductions`, and `net_received`. Links to the `users` table (`worker_id`).
+- **`screenshots`**: Pay-slip evidence attached to shifts. Tracked via `status` (`Pending`, `Confirmed`, `Flagged`, `Unverifiable`) and reviewed by a `verifier_id`.
+- **`anonymized_shifts (View)`**: Secure, read-only view that strips PII (`worker_id`, name, phone) but retains `city_zone` and earnings metrics. The **Analytics Service** interacts strictly with this view.
+
+### Schema: `grievance_svc` (Dispute Resolution)
+Manages worker complaints against platforms.
+- **`grievances`**: Tickets with `category` (e.g. Unfair Deduction) and `status` (Open, Under Review, Resolved). Includes an `is_anonymous` flag.
+- **`grievance_comments`**: Community or advocate replies linked to a grievance.
+- **`grievance_tags`**: Hashtags assigned to grievances to enable clustering and trending topic algorithms.
+
+---
+
+## 4. Development & Deployment
+
+### Environments
+The app seamlessly switches databases using the `ENV` variable defined in `.env`:
+- `ENV=local`: Connects to local PostgreSQL using `DATABASE_URL`.
+- `ENV=prod`: Connects to `SUPABASE_DB_URL` for production.
+
+### Local Initialization
+```bash
+# Sync python dependencies (cached locally)
 uv sync
 
-# 2. Copy local env and fill in your Postgres credentials
-copy .env.local.example .env.local   # already provided as .env.local
-
-# 3. Start services (3 separate terminals)
-uv run uvicorn services.auth.app:app  --reload --port 8001
+# Run services
+uv run uvicorn services.auth.app:app --reload --port 8001
 uv run uvicorn services.users.app:app --reload --port 8002
-uv run uvicorn services.jobs.app:app  --reload --port 8003
+uv run uvicorn services.jobs.app:app --reload --port 8003
 ```
 
-## Swagger Docs
+Docker Compose provides a complete bundled container setup for out-of-the-box local testing. 
 
-| Service | Swagger UI | ReDoc |
-|---------|-----------|-------|
-| Auth    | http://localhost:8001/docs | http://localhost:8001/redoc |
-| Users   | http://localhost:8002/docs | http://localhost:8002/redoc |
-| Jobs    | http://localhost:8003/docs | http://localhost:8003/redoc |
-
-## Docker (local stack with Postgres)
-
-```powershell
-docker-compose up --build
-```
-
-## Environment Files
-
-| File | Purpose | Committed? |
-|------|---------|-----------|
-| `.env` | Shared defaults (no secrets) | ✅ Yes |
-| `.env.local` | Local Postgres credentials | ❌ No |
-| `.env.production` | Supabase credentials | ❌ No |
-
-## Switching Local ↔ Production
-
-The `shared/config.py` `active_db_url` property handles this automatically:
-
-- `ENV=local` → uses `DATABASE_URL` (local Postgres)
-- `ENV=prod`  → uses `SUPABASE_DB_URL` (Supabase Postgres)
-
-## uv Cache
-
-Cache is stored on **E:\uv_cache** (configured in `pyproject.toml` `[tool.uv]`).
+## 5. Security & Privacy Implementation
+- Passwords are strictly hashed with **bcrypt**; raw passwords are never kept.
+- Privacy-first views (like `anonymized_shifts`) actively prevent the analytics dashboards and aggregation queries from inadvertently accessing personally identifiable data.
+- User Identity schema (`auth_svc`) serves as the root of trust, and other services use `ON DELETE CASCADE` appropriately to handle user data requests and GDPR/deletion policies effectively.
