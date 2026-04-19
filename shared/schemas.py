@@ -1,10 +1,14 @@
 """Shared Pydantic schemas used across all services."""
-from datetime import date, datetime
+
+from datetime import datetime
+from typing import Literal, Optional
 from uuid import UUID
-from typing import Optional, Literal
+
 from pydantic import BaseModel, EmailStr
 
-# Token Models
+
+# ── Token ─────────────────────────────────────────────────────────────────────
+
 class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"

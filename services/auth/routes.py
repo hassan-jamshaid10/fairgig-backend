@@ -4,23 +4,25 @@ Auth routes — register, login, refresh, verify token.
 
 import bcrypt
 from datetime import datetime, timezone
-from typing import Annotated
-from sqlalchemy import select, text
-from fastapi.security import OAuth2PasswordRequestForm
-from typing import Optional
-from fastapi import Query
-from shared.schemas import UserRead
-from shared.schemas import UserUpdate
-from shared.schemas import UserBasicRead
+from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import Query
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.database import get_db
-from shared.schemas import TokenPair, UserCreate, UserRead, LoginRequest, RefreshRequest
+from shared.schemas import (
+    LoginRequest,
+    RefreshRequest,
+    TokenPair,
+    UserBasicRead,
+    UserCreate,
+    UserRead,
+    UserUpdate,
+)
 from shared.security import (
     create_access_token,
     create_refresh_token,
