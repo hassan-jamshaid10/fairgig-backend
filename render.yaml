@@ -35,13 +35,30 @@ services:
       sync: false
 
   - type: web
-    name: fairgig-grievance
+    name: fairgig-users
     runtime: python
     repo: https://github.com/hassan-jamshaid10/fairgig-backend.git
     plan: free
     region: oregon
     buildCommand: pip install uv && uv sync --frozen && uv cache prune --ci
-    startCommand: uv run uvicorn services.grievance.app:app --host 0.0.0.0 --port $PORT
+    startCommand: uv run uvicorn services.users.app:app --host 0.0.0.0 --port $PORT
+    autoDeployTrigger: commit
+    envVars:
+    - key: ENV
+      value: prod
+    - key: SUPABASE_DB_URL
+      sync: false
+    - key: SECRET_KEY
+      sync: false
+
+  - type: web
+    name: fairgig-jobs
+    runtime: python
+    repo: https://github.com/hassan-jamshaid10/fairgig-backend.git
+    plan: free
+    region: oregon
+    buildCommand: pip install uv && uv sync --frozen && uv cache prune --ci
+    startCommand: uv run uvicorn services.jobs.app:app --host 0.0.0.0 --port $PORT
     autoDeployTrigger: commit
     envVars:
     - key: ENV

@@ -3,12 +3,12 @@ import io
 import pandas as pd
 import cloudinary
 import cloudinary.uploader
-from datetime import date, timedelta, datetime
-from typing import Annotated, Optional, List
+from datetime import date, timedelta
+from typing import Annotated, Optional
 from pathlib import Path
 from uuid import UUID
 from dotenv import load_dotenv
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Query, Form
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query, Form
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
@@ -20,7 +20,6 @@ from services.earnings.models import ShiftORM
 from shared.schemas import (
     ShiftCreate, 
     ShiftRead, 
-    ShiftReadWithStatus, 
     ShiftHistoryResponse,
     ScreenshotRead,
     PendingQueueResponse,
@@ -147,7 +146,8 @@ async def import_shifts_csv(file: UploadFile = File(...), worker_id: str = Depen
 @router.get("/shifts/me", response_model=ShiftHistoryResponse)
 async def get_my_shifts(db: AsyncSession = Depends(get_db), worker_id: str = Depends(get_current_worker), start_date: date = Query(default=date.today() - timedelta(days=60), alias="from"), end_date: date = Query(default=date.today(), alias="to"), platform: Optional[str] = None, limit: int = 100, offset: int = 0):
     query = "SELECT s.*, COALESCE(sc.status, 'None') as screenshot_status, sc.image_url as screenshot_url FROM earnings_svc.shifts s LEFT JOIN earnings_svc.screenshots sc ON sc.shift_id = s.id WHERE s.worker_id = :worker_id AND s.shift_date BETWEEN :start AND :end"
-    if platform: query += " AND s.platform = :plat"
+    if platform:
+        query += " AND s.platform = :plat"
     query += " ORDER BY s.shift_date DESC LIMIT :limit OFFSET :offset"
     res = await db.execute(text(query), {"worker_id": worker_id, "start": start_date, "end": end_date, "limit": limit, "offset": offset, "plat": platform})
     data = [dict(row) for row in res.mappings().all()]
@@ -205,8 +205,10 @@ async def get_pending_screenshots(limit: int = 50, offset: int = 0, verifier: di
 async def verify_screenshot(shift_id: UUID, payload: ScreenshotVerifyRequest, v_payload: dict = Depends(get_current_verifier), db: AsyncSession = Depends(get_db)):
     res = await db.execute(text("SELECT status FROM earnings_svc.screenshots WHERE shift_id = :sid"), {"sid": str(shift_id)})
     cur_status = res.scalar()
-    if not cur_status: raise HTTPException(status_code=404, detail="Not found.")
-    if cur_status != "Pending": raise HTTPException(status_code=400, detail=f"Already {cur_status}.")
+    if not cur_status:
+        raise HTTPException(status_code=404, detail="Not found.")
+    if cur_status != "Pending":
+        raise HTTPException(status_code=400, detail=f"Already {cur_status}.")
     if payload.status in ["Flagged", "Unverifiable"] and not payload.note:
         raise HTTPException(status_code=400, detail="Note required for rejection.")
 

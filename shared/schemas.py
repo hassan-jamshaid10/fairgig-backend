@@ -1,6 +1,6 @@
 """Shared Pydantic schemas used across all services."""
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Literal, Optional
 from uuid import UUID
 
