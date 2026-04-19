@@ -1,8 +1,5 @@
 import statistics
 from fastapi import FastAPI, HTTPException
-from schemas import AnomalyRequest, AnomalyResponse, AnomalyDetail
-import statistics
-from fastapi import FastAPI, HTTPException
 from schemas import AnomalyRequest, AnomalyResponse, AnomalyDetail, RulesResponse, RuleDetail
 
 app = FastAPI(title="Anomaly Detection Service")

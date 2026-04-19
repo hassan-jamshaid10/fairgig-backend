@@ -69,6 +69,23 @@ services:
       sync: false
 
   - type: web
+    name: fairgig-anomaly
+    runtime: python
+    repo: https://github.com/hassan-jamshaid10/fairgig-backend.git
+    plan: free
+    region: oregon
+    buildCommand: pip install uv && uv sync --frozen && uv cache prune --ci
+    startCommand: uv run uvicorn main:app --app-dir services/anomaly-service --host 0.0.0.0 --port $PORT
+    autoDeployTrigger: commit
+    envVars:
+    - key: ENV
+      value: prod
+    - key: SUPABASE_DB_URL
+      sync: false
+    - key: SECRET_KEY
+      sync: false
+
+  - type: web
     name: fairgig-grievance-node
     runtime: node
     repo: https://github.com/hassan-jamshaid10/fairgig-backend.git
